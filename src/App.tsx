@@ -1,38 +1,77 @@
-const schedules = {
-  'CS-2018-2019': {
-    title: 'CS Courses for 2018-2019',
-    courses: {
-      F101: {
-        term: 'Fall',
-        number: '101',
-        meets: 'MWF 11:00-11:50',
-        title: 'Computer Science: Concepts, Philosophy, and Connections',
-      },
-      F110: {
-        term: 'Fall',
-        number: '110',
-        meets: 'MWF 10:00-10:50',
-        title: 'Intro Programming for non-majors',
-      },
-      S313: {
-        term: 'Spring',
-        number: '313',
-        meets: 'TuTh 15:30-16:50',
-        title: 'Tangible Interaction Design and Learning',
-      },
-      S314: {
-        term: 'Spring',
-        number: '314',
-        meets: 'TuTh 9:30-10:50',
-        title: 'Tech & Human Interaction',
-      },
-    },
-  },
+import { useEffect, useState } from 'react';
+
+type Course = {
+  term: string;
+  number: string;
+  title: string;
+  meets: string;
 };
 
-const schedule = schedules['CS-2018-2019'];
+type Schedule = {
+  title: string;
+  courses: Record<string, Course>;
+};
 
-const App = () => (
+const scheduleUrl =
+  'https://courses.cs.northwestern.edu/394/guides/data/cs-courses-firestore.php';
+
+const App = () => {
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadSchedule = async () => {
+      try {
+        const response = await fetch(scheduleUrl, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Could not load courses (HTTP ${response.status}).`);
+        }
+
+        const data = await response.json();
+        const loadedSchedule = data.schedules?.['CS-2018-2019'];
+        if (!loadedSchedule || typeof loadedSchedule.title !== 'string' ||
+            !loadedSchedule.courses || typeof loadedSchedule.courses !== 'object' ||
+            Array.isArray(loadedSchedule.courses) ||
+            !Object.values(loadedSchedule.courses).every((course) =>
+              course !== null && typeof course === 'object' &&
+              ['term', 'number', 'title', 'meets'].every((field) =>
+                typeof (course as Record<string, unknown>)[field] === 'string'))) {
+          throw new Error('The schedule data is not in the expected format.');
+        }
+
+        if (!controller.signal.aborted) setSchedule(loadedSchedule);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setError(error instanceof Error ? error.message : 'Could not load courses.');
+        }
+      }
+    };
+
+    void loadSchedule();
+    return () => controller.abort();
+  }, []);
+
+  if (error) {
+    return (
+      <main className="p-2 font-sans text-gray-900 sm:p-4">
+        <h1>CS Course Scheduler</h1>
+        <p role="alert">{error} Please refresh the page to try again.</p>
+      </main>
+    );
+  }
+
+  if (!schedule) {
+    return (
+      <main className="p-2 font-sans text-gray-900 sm:p-4">
+        <h1>CS Course Scheduler</h1>
+        <p role="status">Loading courses…</p>
+      </main>
+    );
+  }
+
+  return (
   <main className="p-2 font-sans text-gray-900 sm:p-4">
     <h1>{schedule.title}</h1>
     <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
@@ -49,6 +88,7 @@ const App = () => (
       ))}
     </ul>
   </main>
-);
+  );
+};
 
 export default App;
