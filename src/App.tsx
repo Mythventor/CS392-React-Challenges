@@ -100,9 +100,11 @@ const TermSelector = ({ selectedTerm, onSelect }: {
   </div>
 );
 
-const CourseList = ({ courses, selectedTerm }: {
+const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   courses: Record<string, Course>;
   selectedTerm: Term;
+  selectedCourses: string[];
+  onToggle: (id: string) => void;
 }) => {
   const filteredCourses = Object.entries(courses)
     .filter(([, course]) => course.term === selectedTerm);
@@ -114,14 +116,28 @@ const CourseList = ({ courses, selectedTerm }: {
   return (
     <ul aria-label={`${selectedTerm} courses`} className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
       {filteredCourses.map(([id, course]) => (
-        <li key={id} className="flex min-w-0 flex-col rounded-lg border border-gray-300 bg-white p-5">
-          <h2 className="text-xl font-semibold">
-            {course.term} CS {course.number}
-          </h2>
-          <p className="mt-2 mb-5">{course.title}</p>
-          <p className="mt-auto border-t border-gray-300 pt-3">
-            {course.meets}
-          </p>
+        <li key={id} className="min-w-0">
+          <button
+            type="button"
+            aria-pressed={selectedCourses.includes(id)}
+            onClick={() => onToggle(id)}
+            className={`flex h-full w-full cursor-pointer flex-col rounded-lg border p-5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 ${
+              selectedCourses.includes(id)
+                ? 'border-purple-700 bg-purple-100'
+                : 'border-gray-300 bg-white hover:bg-gray-50'
+            }`}
+          >
+            <span className="text-xl font-semibold">
+              {course.term} CS {course.number}
+              <span aria-hidden="true" className="ml-2 text-purple-700">
+                {selectedCourses.includes(id) ? '✓' : ''}
+              </span>
+            </span>
+            <span className="mt-2 mb-5">{course.title}</span>
+            <span className="mt-auto w-full border-t border-gray-300 pt-3">
+              {course.meets}
+            </span>
+          </button>
         </li>
       ))}
     </ul>
@@ -130,12 +146,26 @@ const CourseList = ({ courses, selectedTerm }: {
 
 const TermPage = ({ schedule }: { schedule: Schedule }) => {
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+
+  const toggleCourse = (id: string) => {
+    setSelectedCourses((previous) =>
+      previous.includes(id)
+        ? previous.filter((courseId) => courseId !== id)
+        : [...previous, id]
+    );
+  };
 
   return (
     <main className="p-2 font-sans text-gray-900 sm:p-4">
       <h1>{schedule.title}</h1>
       <TermSelector selectedTerm={selectedTerm} onSelect={setSelectedTerm} />
-      <CourseList courses={schedule.courses} selectedTerm={selectedTerm} />
+      <CourseList
+        courses={schedule.courses}
+        selectedTerm={selectedTerm}
+        selectedCourses={selectedCourses}
+        onToggle={toggleCourse}
+      />
     </main>
   );
 };
