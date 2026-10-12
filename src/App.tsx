@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Course = {
   term: string;
@@ -81,7 +81,7 @@ const TermSelector = ({ selectedTerm, onSelect }: {
   selectedTerm: Term;
   onSelect: (term: Term) => void;
 }) => (
-  <div role="group" aria-label="Choose a term" className="mb-5 flex flex-wrap gap-2">
+  <div role="group" aria-label="Choose a term" className="flex flex-wrap gap-2">
     {terms.map((term) => (
       <button
         key={term}
@@ -144,9 +144,69 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   );
 };
 
+const CoursePlan = ({ courses, selectedCourses, onClose }: {
+  courses: Record<string, Course>;
+  selectedCourses: string[];
+  onClose: () => void;
+}) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current!;
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    dialog.showModal();
+    document.body.style.overflow = 'hidden';
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="course-plan-title"
+      aria-modal="true"
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent p-4 backdrop:bg-black/50 open:flex open:items-center open:justify-center"
+    >
+      <section className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 font-sans text-gray-900 shadow-xl">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 id="course-plan-title" className="text-2xl font-semibold">Course plan</h2>
+          <button type="button" onClick={onClose} className="cursor-pointer rounded bg-gray-100 px-4 py-2 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-purple-700">
+            Close
+          </button>
+        </div>
+        {selectedCourses.length === 0 ? (
+          <p>No courses selected. Close this window and click a course card to select it.</p>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {selectedCourses.map((id) => {
+              const course = courses[id];
+              return (
+                <li key={id} className="py-3">
+                  <h3 className="font-semibold">{course.term} CS {course.number}</h3>
+                  <p>{course.title}</p>
+                  <p className="mt-1 text-gray-600">{course.meets}</p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </dialog>
+  );
+};
+
 const TermPage = ({ schedule }: { schedule: Schedule }) => {
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [isPlanOpen, setIsPlanOpen] = useState(false);
 
   const toggleCourse = (id: string) => {
     setSelectedCourses((previous) =>
@@ -159,13 +219,21 @@ const TermPage = ({ schedule }: { schedule: Schedule }) => {
   return (
     <main className="p-2 font-sans text-gray-900 sm:p-4">
       <h1>{schedule.title}</h1>
-      <TermSelector selectedTerm={selectedTerm} onSelect={setSelectedTerm} />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <TermSelector selectedTerm={selectedTerm} onSelect={setSelectedTerm} />
+        <button type="button" aria-haspopup="dialog" onClick={() => setIsPlanOpen(true)} className="cursor-pointer rounded bg-purple-700 px-4 py-2 font-medium text-white hover:bg-purple-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700">
+          Course plan
+        </button>
+      </div>
       <CourseList
         courses={schedule.courses}
         selectedTerm={selectedTerm}
         selectedCourses={selectedCourses}
         onToggle={toggleCourse}
       />
+      {isPlanOpen && (
+        <CoursePlan courses={schedule.courses} selectedCourses={selectedCourses} onClose={() => setIsPlanOpen(false)} />
+      )}
     </main>
   );
 };

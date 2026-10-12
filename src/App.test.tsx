@@ -1,7 +1,24 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
 import App from './App';
+
+// jsdom lacks native dialog methods; browser focus trapping is not simulated.
+beforeAll(() => {
+  Object.defineProperties(HTMLDialogElement.prototype, {
+    showModal: { configurable: true, value: function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    } },
+    close: { configurable: true, value: function (this: HTMLDialogElement) {
+      this.removeAttribute('open');
+    } },
+  });
+});
+
+afterAll(() => {
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+  Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+});
 
 afterEach(() => {
   cleanup();
@@ -67,4 +84,56 @@ it('selects multiple courses independently and preserves selections across terms
   expect(screen.getByRole('button', { name: /Fall CS 110/ })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
   expect(screen.getByRole('button', { name: /Winter CS 101/ })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('opens an empty plan and supports inside clicks, close, outside click, and Escape', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses: {} } } }),
+  }));
+  render(<App />);
+  const open = await screen.findByRole('button', { name: 'Course plan' });
+  open.focus();
+  fireEvent.click(open);
+  const dialog = screen.getByRole('dialog', { name: 'Course plan' });
+  expect(within(dialog).getByText(/No courses selected/)).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('heading', { name: 'Course plan' }));
+  expect(dialog).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(open).toHaveFocus();
+  fireEvent.click(open);
+  fireEvent.click(screen.getByRole('dialog'));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(open);
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('shows selected courses across terms and preserves them after closing', async () => {
+  const courses = {
+    F101: { term: 'Fall', number: '101', title: 'Fall class', meets: 'MWF 10:00' },
+    W202: { term: 'Winter', number: '202', title: 'Winter class', meets: 'TuTh 12:00' },
+    W303: { term: 'Winter', number: '303', title: 'Unselected class', meets: 'MWF 13:00' },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
+  }));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: /Fall CS 101/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
+  fireEvent.click(screen.getByRole('button', { name: /Winter CS 202/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Course plan' }));
+  const plan = within(screen.getByRole('dialog'));
+  expect(plan.getAllByRole('listitem')).toHaveLength(2);
+  for (const text of ['Fall CS 101', 'Fall class', 'MWF 10:00', 'Winter CS 202', 'Winter class', 'TuTh 12:00']) {
+    expect(plan.getByText(text)).toBeInTheDocument();
+  }
+  expect(plan.queryByText('Unselected class')).not.toBeInTheDocument();
+  fireEvent.click(plan.getByRole('button', { name: 'Close' }));
+  expect(screen.getByRole('button', { name: /Winter CS 202/ })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: /Winter CS 202/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Course plan' }));
+  expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(1);
 });
