@@ -53,9 +53,9 @@ it('defaults to Fall and switches courses without fetching again', async () => {
 
 it('selects multiple courses independently and preserves selections across terms', async () => {
   const courses = {
-    F101: { term: 'Fall', number: '101', title: 'First course', meets: 'MWF 10:00' },
-    F110: { term: 'Fall', number: '110', title: 'Second course', meets: 'MWF 11:00' },
-    W101: { term: 'Winter', number: '101', title: 'Winter course', meets: 'MWF 10:00' },
+    F101: { term: 'Fall', number: '101', title: 'First course', meets: 'MWF 10:00-10:50' },
+    F110: { term: 'Fall', number: '110', title: 'Second course', meets: 'MWF 11:00-11:50' },
+    W101: { term: 'Winter', number: '101', title: 'Winter course', meets: 'MWF 10:00-10:50' },
   };
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
@@ -112,9 +112,9 @@ it('opens an empty plan and supports inside clicks, close, outside click, and Es
 
 it('shows selected courses across terms and preserves them after closing', async () => {
   const courses = {
-    F101: { term: 'Fall', number: '101', title: 'Fall class', meets: 'MWF 10:00' },
-    W202: { term: 'Winter', number: '202', title: 'Winter class', meets: 'TuTh 12:00' },
-    W303: { term: 'Winter', number: '303', title: 'Unselected class', meets: 'MWF 13:00' },
+    F101: { term: 'Fall', number: '101', title: 'Fall class', meets: 'MWF 10:00-10:50' },
+    W202: { term: 'Winter', number: '202', title: 'Winter class', meets: 'TuTh 12:00-12:50' },
+    W303: { term: 'Winter', number: '303', title: 'Unselected class', meets: 'MWF 13:00-13:50' },
   };
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok: true,
@@ -127,7 +127,7 @@ it('shows selected courses across terms and preserves them after closing', async
   fireEvent.click(screen.getByRole('button', { name: 'Course plan' }));
   const plan = within(screen.getByRole('dialog'));
   expect(plan.getAllByRole('listitem')).toHaveLength(2);
-  for (const text of ['Fall CS 101', 'Fall class', 'MWF 10:00', 'Winter CS 202', 'Winter class', 'TuTh 12:00']) {
+  for (const text of ['Fall CS 101', 'Fall class', 'MWF 10:00-10:50', 'Winter CS 202', 'Winter class', 'TuTh 12:00-12:50']) {
     expect(plan.getByText(text)).toBeInTheDocument();
   }
   expect(plan.queryByText('Unselected class')).not.toBeInTheDocument();
@@ -136,4 +136,38 @@ it('shows selected courses across terms and preserves them after closing', async
   fireEvent.click(screen.getByRole('button', { name: /Winter CS 202/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Course plan' }));
   expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(1);
+});
+
+it('blocks conflicts and restores availability after unselecting', async () => {
+  const courses = {
+    F101: { term: 'Fall', number: '101', title: 'First', meets: 'MWF 9:00-9:50' },
+    F102: { term: 'Fall', number: '102', title: 'Conflict', meets: 'W 9:30-10:20' },
+    F103: { term: 'Fall', number: '103', title: 'Next', meets: 'MWF 9:50-10:40' },
+    F104: { term: 'Fall', number: '104', title: 'No meeting', meets: '' },
+    W101: { term: 'Winter', number: '101', title: 'Other term', meets: 'MWF 9:00-9:50' },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
+  }));
+  render(<App />);
+  const first = await screen.findByRole('button', { name: /Fall CS 101/ });
+  const conflict = screen.getByRole('button', { name: /Fall CS 102/ });
+  fireEvent.click(first);
+  expect(first).toBeEnabled();
+  expect(conflict).toBeDisabled();
+  expect(within(conflict).getByText('Time conflict')).toBeInTheDocument();
+  fireEvent.click(conflict);
+  expect(conflict).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('button', { name: /Fall CS 103/ })).toBeEnabled();
+  expect(screen.getByRole('button', { name: /Fall CS 104/ })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
+  expect(screen.getByRole('button', { name: /Winter CS 101/ })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Fall' }));
+  fireEvent.click(screen.getByRole('button', { name: /Fall CS 101/ }));
+  const restored = screen.getByRole('button', { name: /Fall CS 102/ });
+  expect(restored).toBeEnabled();
+  fireEvent.click(restored);
+  expect(restored).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: /Fall CS 101/ })).toBeDisabled();
 });

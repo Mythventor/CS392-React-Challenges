@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { coursesConflict } from './utilities/time-conflicts.js';
 
 type Course = {
   term: string;
@@ -115,14 +116,19 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
 
   return (
     <ul aria-label={`${selectedTerm} courses`} className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-4">
-      {filteredCourses.map(([id, course]) => (
+      {filteredCourses.map(([id, course]) => {
+        const isSelected = selectedCourses.includes(id);
+        const isBlocked = !isSelected && selectedCourses.some((selectedId) =>
+          coursesConflict(course, courses[selectedId]));
+        return (
         <li key={id} className="min-w-0">
           <button
             type="button"
-            aria-pressed={selectedCourses.includes(id)}
+            aria-pressed={isSelected}
+            disabled={isBlocked}
             onClick={() => onToggle(id)}
-            className={`flex h-full w-full cursor-pointer flex-col rounded-lg border p-5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 ${
-              selectedCourses.includes(id)
+            className={`flex h-full w-full cursor-pointer flex-col rounded-lg border p-5 text-left disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 ${
+              isSelected
                 ? 'border-purple-700 bg-purple-100'
                 : 'border-gray-300 bg-white hover:bg-gray-50'
             }`}
@@ -130,16 +136,18 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
             <span className="text-xl font-semibold">
               {course.term} CS {course.number}
               <span aria-hidden="true" className="ml-2 text-purple-700">
-                {selectedCourses.includes(id) ? '✓' : ''}
+                {isSelected ? '✓' : ''}
               </span>
             </span>
             <span className="mt-2 mb-5">{course.title}</span>
+            {isBlocked && <span className="mb-2 font-semibold">Time conflict</span>}
             <span className="mt-auto w-full border-t border-gray-300 pt-3">
               {course.meets}
             </span>
           </button>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 };
@@ -209,11 +217,12 @@ const TermPage = ({ schedule }: { schedule: Schedule }) => {
   const [isPlanOpen, setIsPlanOpen] = useState(false);
 
   const toggleCourse = (id: string) => {
-    setSelectedCourses((previous) =>
-      previous.includes(id)
-        ? previous.filter((courseId) => courseId !== id)
-        : [...previous, id]
-    );
+    setSelectedCourses((previous) => {
+      if (previous.includes(id)) return previous.filter((courseId) => courseId !== id);
+      if (previous.some((selectedId) =>
+        coursesConflict(schedule.courses[id], schedule.courses[selectedId]))) return previous;
+      return [...previous, id];
+    });
   };
 
   return (
