@@ -171,3 +171,34 @@ it('blocks conflicts and restores availability after unselecting', async () => {
   expect(restored).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: /Fall CS 101/ })).toBeDisabled();
 });
+
+it('edits a course draft without submitting or changing the saved course and selections', async () => {
+  const courses = {
+    W101: { term: 'Winter', number: '101', title: 'Original title', meets: 'MWF 9:00-9:50' },
+    W102: { term: 'Winter', number: '102', title: 'Conflicting course', meets: 'MWF 9:00-9:50' },
+  };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
+  }));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Winter' }));
+  fireEvent.click(screen.getByRole('button', { name: /Winter CS 101/ }));
+  expect(screen.getByRole('button', { name: /Winter CS 102/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole('link', { name: 'Edit Winter CS 102' }));
+  expect(await screen.findByLabelText('Course title')).toHaveValue('Conflicting course');
+  expect(screen.getByLabelText('Meeting times')).toHaveValue('MWF 9:00-9:50');
+  fireEvent.change(screen.getByLabelText('Course title'), { target: { value: 'Draft' } });
+  fireEvent.change(screen.getByLabelText('Meeting times'), { target: { value: 'Anything for now' } });
+  expect(screen.getByLabelText('Course title')).toHaveValue('Draft');
+  expect(screen.getByLabelText('Meeting times')).toHaveValue('Anything for now');
+  expect(screen.queryByRole('button', { name: /submit|save/i })).not.toBeInTheDocument();
+  expect(fireEvent.submit(screen.getByRole('form', { name: 'Edit course' }))).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(await screen.findByRole('button', { name: /Winter CS 101/ })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: /Winter CS 102/ })).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(screen.getByRole('link', { name: 'Edit Winter CS 102' }));
+  expect(await screen.findByLabelText('Course title')).toHaveValue('Conflicting course');
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await screen.findByRole('button', { name: 'Winter' });
+});

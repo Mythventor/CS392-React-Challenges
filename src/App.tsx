@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { coursesConflict } from './utilities/time-conflicts.js';
+import CourseForm from './CourseForm';
+import { useRoute } from './utilities/use-route';
 
 type Course = {
   term: string;
@@ -121,13 +123,13 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
         const isBlocked = !isSelected && selectedCourses.some((selectedId) =>
           coursesConflict(course, courses[selectedId]));
         return (
-        <li key={id} className="min-w-0">
+        <li key={id} className="flex min-w-0 flex-col">
           <button
             type="button"
             aria-pressed={isSelected}
             disabled={isBlocked}
             onClick={() => onToggle(id)}
-            className={`flex h-full w-full cursor-pointer flex-col rounded-lg border p-5 text-left disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 ${
+            className={`flex w-full flex-1 cursor-pointer flex-col rounded-lg border p-5 text-left disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-700 ${
               isSelected
                 ? 'border-purple-700 bg-purple-100'
                 : 'border-gray-300 bg-white hover:bg-gray-50'
@@ -145,6 +147,7 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
               {course.meets}
             </span>
           </button>
+          <a href={`#/courses/${encodeURIComponent(id)}/edit`} aria-label={`Edit ${course.term} CS ${course.number}`} className="mt-2 self-start rounded px-2 py-1 text-purple-700 underline focus-visible:outline-2 focus-visible:outline-purple-700">Edit</a>
         </li>
         );
       })}
@@ -212,6 +215,7 @@ const CoursePlan = ({ courses, selectedCourses, onClose }: {
 };
 
 const TermPage = ({ schedule }: { schedule: Schedule }) => {
+  const route = useRoute();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
@@ -224,6 +228,19 @@ const TermPage = ({ schedule }: { schedule: Schedule }) => {
       return [...previous, id];
     });
   };
+
+  if (route !== '/') {
+    const match = /^\/courses\/([^/]+)\/edit$/.exec(route);
+    let courseId = '';
+    try { courseId = match ? decodeURIComponent(match[1]) : ''; } catch { /* Invalid URL. */ }
+    const course = Object.hasOwn(schedule.courses, courseId) ? schedule.courses[courseId] : null;
+    return course ? <CourseForm key={courseId} course={course} /> : (
+      <main className="p-4 font-sans">
+        <h1>Course not found</h1>
+        <a href="#/" className="text-purple-700 underline">Return to courses</a>
+      </main>
+    );
+  }
 
   return (
     <main className="p-2 font-sans text-gray-900 sm:p-4">
