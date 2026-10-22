@@ -1,3 +1,4 @@
+import { loadSchedule } from './utilities/firebase';
 import { useEffect, useRef, useState } from 'react';
 import { coursesConflict } from './utilities/time-conflicts.js';
 import CourseForm from './CourseForm';
@@ -15,9 +16,6 @@ type Schedule = {
   courses: Record<string, Course>;
 };
 
-const scheduleUrl =
-  'https://courses.cs.northwestern.edu/394/guides/data/cs-courses-firestore.php';
-
 const App = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,15 +23,9 @@ const App = () => {
   useEffect(() => {
     const controller = new AbortController();
 
-    const loadSchedule = async () => {
+    const fetchSchedule = async () => {
       try {
-        const response = await fetch(scheduleUrl, { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`Could not load courses (HTTP ${response.status}).`);
-        }
-
-        const data = await response.json();
-        const loadedSchedule = data.schedules?.['CS-2018-2019'];
+        const loadedSchedule = await loadSchedule();
         if (!loadedSchedule || typeof loadedSchedule.title !== 'string' ||
             !loadedSchedule.courses || typeof loadedSchedule.courses !== 'object' ||
             Array.isArray(loadedSchedule.courses) ||
@@ -44,7 +36,7 @@ const App = () => {
           throw new Error('The schedule data is not in the expected format.');
         }
 
-        if (!controller.signal.aborted) setSchedule(loadedSchedule);
+        if (!controller.signal.aborted) setSchedule(loadedSchedule as Schedule);
       } catch (error) {
         if (!controller.signal.aborted) {
           setError(error instanceof Error ? error.message : 'Could not load courses.');
@@ -52,7 +44,7 @@ const App = () => {
       }
     };
 
-    void loadSchedule();
+    void fetchSchedule();
     return () => controller.abort();
   }, []);
 
@@ -110,7 +102,8 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   onToggle: (id: string) => void;
 }) => {
   const filteredCourses = Object.entries(courses)
-    .filter(([, course]) => course.term === selectedTerm);
+    .filter(([, course]) => course.term === selectedTerm)
+    .sort(([, first], [, second]) => first.number.localeCompare(second.number, undefined, { numeric: true }));
 
   if (filteredCourses.length === 0) {
     return <p>No courses available for {selectedTerm}.</p>;

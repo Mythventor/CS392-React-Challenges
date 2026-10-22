@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /schedules/CS-2018-2019 {
+      allow get: if true;
+      allow list, write: if false;
+    }
+  }
+}

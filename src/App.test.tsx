@@ -2,6 +2,12 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
 import App from './App';
+import { loadSchedule } from './utilities/firebase';
+vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn() }));
+
+const mockSchedule = (courses: Record<string, unknown>) => {
+  vi.mocked(loadSchedule).mockResolvedValue({ title: 'CS Courses', courses });
+};
 
 // jsdom lacks native dialog methods; browser focus trapping is not simulated.
 beforeAll(() => {
@@ -23,17 +29,15 @@ afterAll(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.resetAllMocks();
 });
 
 it('defaults to Fall and switches courses without fetching again', async () => {
   const courses = Object.fromEntries(['Fall', 'Winter', 'Spring'].map((term) => [
     term, { term, number: '101', title: `${term} class`, meets: 'MWF 10:00-10:50' },
   ]));
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
-  });
-  vi.stubGlobal('fetch', fetchMock);
+  mockSchedule(courses);
+  const fetchMock = vi.mocked(loadSchedule);
   render(<App />);
 
   await screen.findByRole('list', { name: 'Fall courses' });
@@ -57,10 +61,7 @@ it('selects multiple courses independently and preserves selections across terms
     F110: { term: 'Fall', number: '110', title: 'Second course', meets: 'MWF 11:00-11:50' },
     W101: { term: 'Winter', number: '101', title: 'Winter course', meets: 'MWF 10:00-10:50' },
   };
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
-  }));
+  mockSchedule(courses);
   render(<App />);
   const first = await screen.findByRole('button', { name: /Fall CS 101/ });
   const second = screen.getByRole('button', { name: /Fall CS 110/ });
@@ -87,10 +88,7 @@ it('selects multiple courses independently and preserves selections across terms
 });
 
 it('opens an empty plan and supports inside clicks, close, outside click, and Escape', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses: {} } } }),
-  }));
+  mockSchedule({});
   render(<App />);
   const open = await screen.findByRole('button', { name: 'Course plan' });
   open.focus();
@@ -116,10 +114,7 @@ it('shows selected courses across terms and preserves them after closing', async
     W202: { term: 'Winter', number: '202', title: 'Winter class', meets: 'TuTh 12:00-12:50' },
     W303: { term: 'Winter', number: '303', title: 'Unselected class', meets: 'MWF 13:00-13:50' },
   };
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
-  }));
+  mockSchedule(courses);
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: /Fall CS 101/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
@@ -146,10 +141,7 @@ it('blocks conflicts and restores availability after unselecting', async () => {
     F104: { term: 'Fall', number: '104', title: 'No meeting', meets: '' },
     W101: { term: 'Winter', number: '101', title: 'Other term', meets: 'MWF 9:00-9:50' },
   };
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
-  }));
+  mockSchedule(courses);
   render(<App />);
   const first = await screen.findByRole('button', { name: /Fall CS 101/ });
   const conflict = screen.getByRole('button', { name: /Fall CS 102/ });
@@ -177,10 +169,7 @@ it('edits a course draft without submitting or changing the saved course and sel
     W101: { term: 'Winter', number: '101', title: 'Original title', meets: 'MWF 9:00-9:50' },
     W102: { term: 'Winter', number: '102', title: 'Conflicting course', meets: 'MWF 9:00-9:50' },
   };
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ schedules: { 'CS-2018-2019': { title: 'CS Courses', courses } } }),
-  }));
+  mockSchedule(courses);
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Winter' }));
   fireEvent.click(screen.getByRole('button', { name: /Winter CS 101/ }));
@@ -201,4 +190,11 @@ it('edits a course draft without submitting or changing the saved course and sel
   expect(await screen.findByLabelText('Course title')).toHaveValue('Conflicting course');
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   await screen.findByRole('button', { name: 'Winter' });
+});
+
+it('shows loading while Firestore is pending and a readable connection error', async () => {
+  vi.mocked(loadSchedule).mockRejectedValue(new Error('Firestore unavailable'));
+  render(<App />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading courses');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Firestore unavailable');
 });
