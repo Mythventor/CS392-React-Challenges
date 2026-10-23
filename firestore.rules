@@ -23,8 +23,8 @@ service cloud.firestore {
     }
     match /schedules/CS-2018-2019 {
       allow get: if true;
-      // Public editing is intentional for this classroom demo.
-      allow update: if validUpdate();
+      // Reading is public; saving requires a signed-in user.
+      allow update: if request.auth != null && validUpdate();
       allow list, create, delete: if false;
     }
   }

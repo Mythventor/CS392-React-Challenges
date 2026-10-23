@@ -5,7 +5,7 @@ import { doc, FieldPath, getDoc, getFirestore, updateDoc } from 'firebase/firest
 import config from '../firebase-config.json';
 
 // Firebase web configuration is public; Firestore rules control access.
-const app = initializeApp(config);
+export const app = initializeApp(config);
 const db = getFirestore(app);
 
 export const loadSchedule = async () => {

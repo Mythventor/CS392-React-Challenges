@@ -1,13 +1,26 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import App from './App';
+import { useAuth } from './auth';
+import type { User } from 'firebase/auth';
+vi.mock('./auth', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  AuthBanner: () => <header>Authentication banner</header>,
+  useAuth: vi.fn(),
+}));
 import { loadSchedule, saveCourse } from './utilities/firebase';
 vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn(), saveCourse: vi.fn() }));
 
 const mockSchedule = (courses: Record<string, unknown>) => {
   vi.mocked(loadSchedule).mockResolvedValue({ title: 'CS Courses', courses });
 };
+
+const signedIn = { uid: 'test-user', displayName: 'Test User' } as User;
+const mockAuth = (user: User | null) => vi.mocked(useAuth).mockReturnValue({
+  user, loading: false, busy: false, error: null, signIn: vi.fn(), logOut: vi.fn(),
+});
+beforeEach(() => mockAuth(signedIn));
 
 // jsdom lacks native dialog methods; browser focus trapping is not simulated.
 beforeAll(() => {
@@ -209,4 +222,14 @@ it('updates the course card after a successful submission without refetching', a
   expect(await screen.findByRole('button', { name: /Updated title/ })).toBeInTheDocument();
   expect(saveCourse).toHaveBeenCalledWith('F101', { title: 'Updated title', term: 'Fall', number: '101', meets: '' });
   expect(loadSchedule).toHaveBeenCalledTimes(1);
+});
+
+it('keeps browsing and selection public but hides editing when signed out', async () => {
+  mockAuth(null);
+  mockSchedule({ F101: { title: 'Public course', term: 'Fall', number: '101', meets: '' } });
+  render(<App />);
+  const card = await screen.findByRole('button', { name: /Public course/ });
+  fireEvent.click(card);
+  expect(card).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByRole('link', { name: /Edit/ })).not.toBeInTheDocument();
 });

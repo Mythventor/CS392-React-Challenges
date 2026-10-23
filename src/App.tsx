@@ -1,3 +1,4 @@
+import { AuthProvider, AuthBanner, useAuth } from './auth';
 import { loadSchedule, saveCourse } from './utilities/firebase';
 import { useEffect, useRef, useState } from 'react';
 import { coursesConflict } from './utilities/time-conflicts.js';
@@ -16,7 +17,7 @@ type Schedule = {
   courses: Record<string, Course>;
 };
 
-const App = () => {
+const ScheduleApp = () => {
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +104,7 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   selectedCourses: string[];
   onToggle: (id: string) => void;
 }) => {
+  const { user } = useAuth();
   const filteredCourses = Object.entries(courses)
     .filter(([, course]) => course.term === selectedTerm)
     .sort(([, first], [, second]) => first.number.localeCompare(second.number, undefined, { numeric: true }));
@@ -142,7 +144,7 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
               {course.meets}
             </span>
           </button>
-          <a href={`#/courses/${encodeURIComponent(id)}/edit`} aria-label={`Edit ${course.term} CS ${course.number}`} className="mt-2 self-start rounded px-2 py-1 text-purple-700 underline focus-visible:outline-2 focus-visible:outline-purple-700">Edit</a>
+          {user && <a href={`#/courses/${encodeURIComponent(id)}/edit`} aria-label={`Edit ${course.term} CS ${course.number}`} className="mt-2 self-start rounded px-2 py-1 text-purple-700 underline focus-visible:outline-2 focus-visible:outline-purple-700">Edit</a>}
         </li>
         );
       })}
@@ -211,6 +213,7 @@ const CoursePlan = ({ courses, selectedCourses, onClose }: {
 
 const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: string, course: Course) => void }) => {
   const route = useRoute();
+  const { user, loading } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
@@ -225,6 +228,14 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
   };
 
   if (route !== '/') {
+    if (loading) return <main className="p-4 font-sans"><p role="status">Checking sign-in…</p></main>;
+    if (!user) return (
+      <main className="p-4 font-sans">
+        <h1>Sign in to edit courses</h1>
+        <p>Use the Google sign-in button above to continue. Unsaved edits are discarded when you sign out.</p>
+        <a href="#/" className="text-purple-700 underline">Return to courses</a>
+      </main>
+    );
     const match = /^\/courses\/([^/]+)\/edit$/.exec(route);
     let courseId = '';
     try { courseId = match ? decodeURIComponent(match[1]) : ''; } catch { /* Invalid URL. */ }
@@ -266,5 +277,12 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
     </main>
   );
 };
+
+const App = () => (
+  <AuthProvider>
+    <AuthBanner />
+    <ScheduleApp />
+  </AuthProvider>
+);
 
 export default App;
