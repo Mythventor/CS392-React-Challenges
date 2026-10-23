@@ -2,8 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
 import App from './App';
-import { loadSchedule } from './utilities/firebase';
-vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn() }));
+import { loadSchedule, saveCourse } from './utilities/firebase';
+vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn(), saveCourse: vi.fn() }));
 
 const mockSchedule = (courses: Record<string, unknown>) => {
   vi.mocked(loadSchedule).mockResolvedValue({ title: 'CS Courses', courses });
@@ -181,7 +181,7 @@ it('edits a course draft without submitting or changing the saved course and sel
   fireEvent.change(screen.getByLabelText('Meeting times'), { target: { value: 'Anything for now' } });
   expect(screen.getByLabelText('Course title')).toHaveValue('Draft');
   expect(screen.getByLabelText('Meeting times')).toHaveValue('Anything for now');
-  expect(screen.queryByRole('button', { name: /submit|save/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();
   expect(fireEvent.submit(screen.getByRole('form', { name: 'Edit course' }))).toBe(false);
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(await screen.findByRole('button', { name: /Winter CS 101/ })).toHaveAttribute('aria-pressed', 'true');
@@ -197,4 +197,16 @@ it('shows loading while Firestore is pending and a readable connection error', a
   render(<App />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading courses');
   expect(await screen.findByRole('alert')).toHaveTextContent('Firestore unavailable');
+});
+
+it('updates the course card after a successful submission without refetching', async () => {
+  mockSchedule({ F101: { title: 'Original title', term: 'Fall', number: '101', meets: '' } });
+  vi.mocked(saveCourse).mockResolvedValue(undefined);
+  render(<App />);
+  fireEvent.click(await screen.findByRole('link', { name: 'Edit Fall CS 101' }));
+  fireEvent.change(await screen.findByLabelText('Course title'), { target: { value: 'Updated title' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+  expect(await screen.findByRole('button', { name: /Updated title/ })).toBeInTheDocument();
+  expect(saveCourse).toHaveBeenCalledWith('F101', { title: 'Updated title', term: 'Fall', number: '101', meets: '' });
+  expect(loadSchedule).toHaveBeenCalledTimes(1);
 });

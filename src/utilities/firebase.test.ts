@@ -5,9 +5,11 @@ vi.mock('firebase/firestore/lite', () => ({
   getFirestore: vi.fn(() => ({})),
   doc: vi.fn(() => 'schedule-reference'),
   getDoc: vi.fn(),
+  updateDoc: vi.fn(),
+  FieldPath: class { constructor(..._parts: string[]) { void _parts; } },
 }));
-import { doc, getDoc } from 'firebase/firestore/lite';
-import { loadSchedule } from './firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore/lite';
+import { loadSchedule, saveCourse } from './firebase';
 
 beforeEach(() => vi.clearAllMocks());
 it('reads the schedule document', async () => {
@@ -23,4 +25,14 @@ it('reports a missing schedule', async () => {
 it('propagates connection errors to the app', async () => {
   vi.mocked(getDoc).mockRejectedValue(new Error('Permission denied'));
   await expect(loadSchedule()).rejects.toThrow('Permission denied');
+});
+
+it('updates one course without replacing the schedule', async () => {
+  const course = { title: 'AI', term: 'Fall', number: '101', meets: '' };
+  await saveCourse('F101', course);
+  expect(updateDoc).toHaveBeenCalledWith('schedule-reference', expect.anything(), course, expect.anything(), 'F101');
+});
+it('rejects invalid data before writing', async () => {
+  await expect(saveCourse('F101', { title: 'X', term: 'Fall', number: '101', meets: '' })).rejects.toThrow('Invalid course');
+  expect(updateDoc).not.toHaveBeenCalled();
 });

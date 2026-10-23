@@ -1,4 +1,4 @@
-import { loadSchedule } from './utilities/firebase';
+import { loadSchedule, saveCourse } from './utilities/firebase';
 import { useEffect, useRef, useState } from 'react';
 import { coursesConflict } from './utilities/time-conflicts.js';
 import CourseForm from './CourseForm';
@@ -66,7 +66,9 @@ const App = () => {
     );
   }
 
-  return <TermPage schedule={schedule} />;
+  return <TermPage schedule={schedule} onSaved={(id, course) => {
+    setSchedule((previous) => previous && ({ ...previous, courses: { ...previous.courses, [id]: course } }));
+  }} />;
 };
 
 const terms = ['Fall', 'Winter', 'Spring'] as const;
@@ -207,7 +209,7 @@ const CoursePlan = ({ courses, selectedCourses, onClose }: {
   );
 };
 
-const TermPage = ({ schedule }: { schedule: Schedule }) => {
+const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: string, course: Course) => void }) => {
   const route = useRoute();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
@@ -227,7 +229,15 @@ const TermPage = ({ schedule }: { schedule: Schedule }) => {
     let courseId = '';
     try { courseId = match ? decodeURIComponent(match[1]) : ''; } catch { /* Invalid URL. */ }
     const course = Object.hasOwn(schedule.courses, courseId) ? schedule.courses[courseId] : null;
-    return course ? <CourseForm key={courseId} course={course} /> : (
+    return course ? <CourseForm key={courseId} course={course} onSave={async (draft) => {
+      await saveCourse(courseId, draft);
+      onSaved(courseId, draft);
+      setSelectedTerm(draft.term === 'Summer' ? selectedTerm : draft.term as Term);
+      // Remove the edited course from the plan if its new time causes a conflict.
+      setSelectedCourses((previous) => previous.includes(courseId) && previous.some((id) =>
+        id !== courseId && coursesConflict(draft, schedule.courses[id]))
+        ? previous.filter((id) => id !== courseId) : previous);
+    }} /> : (
       <main className="p-4 font-sans">
         <h1>Course not found</h1>
         <a href="#/" className="text-purple-700 underline">Return to courses</a>
