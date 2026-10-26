@@ -1,6 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    match /users/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
     function validCourse(course) {
       return course.keys().hasAll(['title', 'term', 'number', 'meets'])
         && course.keys().hasOnly(['title', 'term', 'number', 'meets'])
@@ -23,8 +32,8 @@ service cloud.firestore {
     }
     match /schedules/CS-2018-2019 {
       allow get: if true;
-      // Reading is public; saving requires a signed-in user.
-      allow update: if request.auth != null && validUpdate();
+      // Reading is public; saving requires a signed-in administrator.
+      allow update: if isAdmin() && validUpdate();
       allow list, create, delete: if false;
     }
   }

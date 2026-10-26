@@ -9,7 +9,7 @@ vi.mock('firebase/firestore/lite', () => ({
   FieldPath: class { constructor(..._parts: string[]) { void _parts; } },
 }));
 import { doc, getDoc, updateDoc } from 'firebase/firestore/lite';
-import { loadSchedule, saveCourse } from './firebase';
+import { loadSchedule, saveCourse, loadAdminRole } from './firebase';
 
 beforeEach(() => vi.clearAllMocks());
 it('reads the schedule document', async () => {
@@ -35,4 +35,14 @@ it('updates one course without replacing the schedule', async () => {
 it('rejects invalid data before writing', async () => {
   await expect(saveCourse('F101', { title: 'X', term: 'Fall', number: '101', meets: '' })).rejects.toThrow('Invalid course');
   expect(updateDoc).not.toHaveBeenCalled();
+});
+
+it.each([true, false, 'true', undefined])('grants editing only for boolean isAdmin=true (%s)', async (role) => {
+  vi.mocked(getDoc).mockResolvedValue({ exists: () => true, data: () => ({ isAdmin: role }) } as never);
+  expect(await loadAdminRole('test-user')).toBe(role === true);
+  expect(doc).toHaveBeenCalledWith(expect.anything(), 'users', 'test-user');
+});
+it('denies editing for a missing profile', async () => {
+  vi.mocked(getDoc).mockResolvedValue({ exists: () => false } as never);
+  expect(await loadAdminRole('unknown')).toBe(false);
 });

@@ -18,7 +18,7 @@ const mockSchedule = (courses: Record<string, unknown>) => {
 
 const signedIn = { uid: 'test-user', displayName: 'Test User' } as User;
 const mockAuth = (user: User | null) => vi.mocked(useAuth).mockReturnValue({
-  user, loading: false, busy: false, error: null, signIn: vi.fn(), logOut: vi.fn(),
+  user, isAdmin: Boolean(user), roleLoading: false, loading: false, busy: false, error: null, signIn: vi.fn(), logOut: vi.fn(),
 });
 beforeEach(() => mockAuth(signedIn));
 

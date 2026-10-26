@@ -104,7 +104,7 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   selectedCourses: string[];
   onToggle: (id: string) => void;
 }) => {
-  const { user } = useAuth();
+  const { isAdmin } = useAuth();
   const filteredCourses = Object.entries(courses)
     .filter(([, course]) => course.term === selectedTerm)
     .sort(([, first], [, second]) => first.number.localeCompare(second.number, undefined, { numeric: true }));
@@ -144,7 +144,7 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
               {course.meets}
             </span>
           </button>
-          {user && <a href={`#/courses/${encodeURIComponent(id)}/edit`} aria-label={`Edit ${course.term} CS ${course.number}`} className="mt-2 self-start rounded px-2 py-1 text-purple-700 underline focus-visible:outline-2 focus-visible:outline-purple-700">Edit</a>}
+          {isAdmin && <a href={`#/courses/${encodeURIComponent(id)}/edit`} aria-label={`Edit ${course.term} CS ${course.number}`} className="mt-2 self-start rounded px-2 py-1 text-purple-700 underline focus-visible:outline-2 focus-visible:outline-purple-700">Edit</a>}
         </li>
         );
       })}
@@ -213,7 +213,7 @@ const CoursePlan = ({ courses, selectedCourses, onClose }: {
 
 const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: string, course: Course) => void }) => {
   const route = useRoute();
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin, roleLoading } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
@@ -233,6 +233,14 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
       <main className="p-4 font-sans">
         <h1>Sign in to edit courses</h1>
         <p>Use the Google sign-in button above to continue. Unsaved edits are discarded when you sign out.</p>
+        <a href="#/" className="text-purple-700 underline">Return to courses</a>
+      </main>
+    );
+    if (roleLoading) return <main className="p-4 font-sans"><p role="status">Checking editing permissions…</p></main>;
+    if (!isAdmin) return (
+      <main className="p-4 font-sans">
+        <h1>Administrator access required</h1>
+        <p>You can browse and select courses. Only administrators can edit course information.</p>
         <a href="#/" className="text-purple-700 underline">Return to courses</a>
       </main>
     );

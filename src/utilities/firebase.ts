@@ -20,3 +20,8 @@ export const saveCourse = async (courseId: string, course: CourseData) => {
     new FieldPath('courses', courseId), course,
     new FieldPath('lastEditedCourseId'), courseId);
 };
+
+export const loadAdminRole = async (uid: string) => {
+  const profile = await getDoc(doc(db, 'users', uid));
+  return profile.exists() && profile.data().isAdmin === true;
+};
