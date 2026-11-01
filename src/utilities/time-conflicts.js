@@ -3,7 +3,7 @@ const toMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
-const parseMeeting = (meets) => {
+export const parseMeeting = (meets) => {
   if (!meets.trim()) return null;
   const [days, times] = meets.trim().split(/\s+/);
   const [start, end] = times.split('-').map(toMinutes);

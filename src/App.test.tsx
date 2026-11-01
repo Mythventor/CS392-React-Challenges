@@ -136,7 +136,7 @@ it('shows selected courses across terms and preserves them after closing', async
   const plan = within(screen.getByRole('dialog'));
   expect(plan.getAllByRole('listitem')).toHaveLength(2);
   for (const text of ['Fall CS 101', 'Fall class', 'MWF 10:00-10:50', 'Winter CS 202', 'Winter class', 'TuTh 12:00-12:50']) {
-    expect(plan.getByText(text)).toBeInTheDocument();
+    expect(within(plan.getByRole('list', { name: 'Selected course details' })).getByText(text)).toBeInTheDocument();
   }
   expect(plan.queryByText('Unselected class')).not.toBeInTheDocument();
   fireEvent.click(plan.getByRole('button', { name: 'Close' }));

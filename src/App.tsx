@@ -1,3 +1,4 @@
+import WeeklyCalendar from './WeeklyCalendar';
 import { AuthProvider, AuthBanner, useAuth } from './auth';
 import { loadSchedule, saveCourse } from './utilities/firebase';
 import { useEffect, useRef, useState } from 'react';
@@ -152,9 +153,10 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
   );
 };
 
-const CoursePlan = ({ courses, selectedCourses, onClose }: {
+const CoursePlan = ({ courses, selectedCourses, selectedTerm, onClose }: {
   courses: Record<string, Course>;
   selectedCourses: string[];
+  selectedTerm: Term;
   onClose: () => void;
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -183,17 +185,19 @@ const CoursePlan = ({ courses, selectedCourses, onClose }: {
       }}
       className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent p-4 backdrop:bg-black/50 open:flex open:items-center open:justify-center"
     >
-      <section className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-6 font-sans text-gray-900 shadow-xl">
+      <section className="max-h-[80vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-4 sm:p-6 font-sans text-gray-900 shadow-xl">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 id="course-plan-title" className="text-2xl font-semibold">Course plan</h2>
           <button type="button" onClick={onClose} className="cursor-pointer rounded bg-gray-100 px-4 py-2 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-purple-700">
             Close
           </button>
         </div>
+        <WeeklyCalendar courses={selectedCourses.map((id) => ({ id, ...courses[id] }))} term={selectedTerm} />
+        <h3 className="mt-6 mb-2 text-lg font-semibold">All selected courses</h3>
         {selectedCourses.length === 0 ? (
-          <p>No courses selected. Close this window and click a course card to select it.</p>
+          <p>Your course plan is empty.</p>
         ) : (
-          <ul className="divide-y divide-gray-200">
+          <ul aria-label="Selected course details" className="divide-y divide-gray-200">
             {selectedCourses.map((id) => {
               const course = courses[id];
               return (
@@ -280,7 +284,7 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
         onToggle={toggleCourse}
       />
       {isPlanOpen && (
-        <CoursePlan courses={schedule.courses} selectedCourses={selectedCourses} onClose={() => setIsPlanOpen(false)} />
+        <CoursePlan courses={schedule.courses} selectedCourses={selectedCourses} selectedTerm={selectedTerm} onClose={() => setIsPlanOpen(false)} />
       )}
     </main>
   );
