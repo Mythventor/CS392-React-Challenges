@@ -10,6 +10,18 @@ service cloud.firestore {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, write: if false;
     }
+    match /plans/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['selectedCourses'])
+        && request.resource.data.keys().hasAll(['selectedCourses'])
+        && request.resource.data.selectedCourses is list
+        && request.resource.data.selectedCourses.size() <= 500
+        && request.resource.data.selectedCourses.toSet().size() == request.resource.data.selectedCourses.size()
+        && request.resource.data.selectedCourses.toSet().hasOnly(
+          get(/databases/$(database)/documents/schedules/CS-2018-2019).data.courses.keys());
+      allow list, delete: if false;
+    }
     function validCourse(course) {
       return course.keys().hasAll(['title', 'term', 'number', 'meets'])
         && course.keys().hasOnly(['title', 'term', 'number', 'meets'])

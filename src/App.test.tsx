@@ -9,8 +9,8 @@ vi.mock('./auth', () => ({
   AuthBanner: () => <header>Authentication banner</header>,
   useAuth: vi.fn(),
 }));
-import { loadSchedule, saveCourse } from './utilities/firebase';
-vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn(), saveCourse: vi.fn() }));
+import { loadSchedule, saveCourse, loadPlan, savePlan } from './utilities/firebase';
+vi.mock('./utilities/firebase', () => ({ loadSchedule: vi.fn(), saveCourse: vi.fn(), loadPlan: vi.fn().mockResolvedValue([]), savePlan: vi.fn().mockResolvedValue(undefined) }));
 
 const mockSchedule = (courses: Record<string, unknown>) => {
   vi.mocked(loadSchedule).mockResolvedValue({ title: 'CS Courses', courses });
@@ -20,7 +20,7 @@ const signedIn = { uid: 'test-user', displayName: 'Test User' } as User;
 const mockAuth = (user: User | null) => vi.mocked(useAuth).mockReturnValue({
   user, isAdmin: Boolean(user), roleLoading: false, loading: false, busy: false, error: null, signIn: vi.fn(), logOut: vi.fn(),
 });
-beforeEach(() => mockAuth(signedIn));
+beforeEach(() => { mockAuth(signedIn); vi.mocked(loadPlan).mockResolvedValue([]); vi.mocked(savePlan).mockResolvedValue(undefined); });
 
 // jsdom lacks native dialog methods; browser focus trapping is not simulated.
 beforeAll(() => {

@@ -14,7 +14,7 @@ vi.mock('firebase/auth', () => ({
   signInWithPopup: vi.fn().mockResolvedValue({}),
   signOut: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('./utilities/firebase', () => ({ app: {}, loadAdminRole: vi.fn().mockResolvedValue(true), loadSchedule: vi.fn(), saveCourse: vi.fn() }));
+vi.mock('./utilities/firebase', () => ({ app: {}, loadAdminRole: vi.fn().mockResolvedValue(true), loadSchedule: vi.fn(), saveCourse: vi.fn(), loadPlan: vi.fn().mockResolvedValue([]), savePlan: vi.fn().mockResolvedValue(undefined) }));
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { loadSchedule, loadAdminRole } from './utilities/firebase';
 import { AuthProvider, AuthBanner } from './auth';

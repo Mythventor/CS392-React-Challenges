@@ -6,10 +6,11 @@ vi.mock('firebase/firestore/lite', () => ({
   doc: vi.fn(() => 'schedule-reference'),
   getDoc: vi.fn(),
   updateDoc: vi.fn(),
+  setDoc: vi.fn(),
   FieldPath: class { constructor(..._parts: string[]) { void _parts; } },
 }));
-import { doc, getDoc, updateDoc } from 'firebase/firestore/lite';
-import { loadSchedule, saveCourse, loadAdminRole } from './firebase';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore/lite';
+import { loadSchedule, saveCourse, loadAdminRole, loadPlan, savePlan } from './firebase';
 
 beforeEach(() => vi.clearAllMocks());
 it('reads the schedule document', async () => {
@@ -45,4 +46,24 @@ it.each([true, false, 'true', undefined])('grants editing only for boolean isAdm
 it('denies editing for a missing profile', async () => {
   vi.mocked(getDoc).mockResolvedValue({ exists: () => false } as never);
   expect(await loadAdminRole('unknown')).toBe(false);
+});
+
+it('loads selections from the signed-in user plan path', async () => {
+  vi.mocked(getDoc).mockResolvedValue({ exists: () => true, data: () => ({ selectedCourses: ['F101'] }) } as never);
+  expect(await loadPlan('alice')).toEqual(['F101']);
+  expect(doc).toHaveBeenCalledWith(expect.anything(), 'plans', 'alice');
+});
+it('starts with an empty plan for a missing document without writing', async () => {
+  vi.mocked(getDoc).mockResolvedValue({ exists: () => false } as never);
+  expect(await loadPlan('alice')).toEqual([]);
+  expect(setDoc).not.toHaveBeenCalled();
+});
+it('rejects corrupt saved selections instead of treating them as an empty plan', async () => {
+  vi.mocked(getDoc).mockResolvedValue({ exists: () => true, data: () => ({ selectedCourses: [123] }) } as never);
+  await expect(loadPlan('alice')).rejects.toThrow('Invalid saved plan');
+});
+it('saves only the selected IDs in the owner document', async () => {
+  await savePlan('alice', ['F101', 'W101']);
+  expect(doc).toHaveBeenCalledWith(expect.anything(), 'plans', 'alice');
+  expect(setDoc).toHaveBeenCalledWith('schedule-reference', { selectedCourses: ['F101', 'W101'] });
 });

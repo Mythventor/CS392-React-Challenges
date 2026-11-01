@@ -1,3 +1,4 @@
+import useSavedPlan from './useSavedPlan';
 import WeeklyCalendar from './WeeklyCalendar';
 import { AuthProvider, AuthBanner, useAuth } from './auth';
 import { loadSchedule, saveCourse } from './utilities/firebase';
@@ -19,6 +20,7 @@ type Schedule = {
 };
 
 const ScheduleApp = () => {
+  const { user, loading: authLoading } = useAuth();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +70,7 @@ const ScheduleApp = () => {
     );
   }
 
-  return <TermPage schedule={schedule} onSaved={(id, course) => {
+  return <TermPage key={authLoading ? 'checking-auth' : user?.uid || 'guest'} schedule={schedule} onSaved={(id, course) => {
     setSchedule((previous) => previous && ({ ...previous, courses: { ...previous.courses, [id]: course } }));
   }} />;
 };
@@ -219,7 +221,7 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
   const route = useRoute();
   const { user, loading, isAdmin, roleLoading } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
-  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const { selectedCourses, setSelectedCourses, ready, status, error: planError, retry } = useSavedPlan(user?.uid ?? null, schedule.courses);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
 
   const toggleCourse = (id: string) => {
@@ -277,12 +279,19 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
           Course plan
         </button>
       </div>
+      <div className="mb-4 text-sm">
+        <p role={planError ? 'alert' : 'status'}>{status}</p>
+        {planError && <button type="button" onClick={retry} className="mt-2 rounded bg-gray-100 px-3 py-2">Retry plan {planError === 'load' ? 'load' : 'save'}</button>}
+      </div>
+      <fieldset disabled={!ready || loading} className="m-0 min-w-0 border-0 p-0">
+      <legend className="sr-only">Course selections</legend>
       <CourseList
         courses={schedule.courses}
         selectedTerm={selectedTerm}
         selectedCourses={selectedCourses}
         onToggle={toggleCourse}
       />
+      </fieldset>
       {isPlanOpen && (
         <CoursePlan courses={schedule.courses} selectedCourses={selectedCourses} selectedTerm={selectedTerm} onClose={() => setIsPlanOpen(false)} />
       )}
