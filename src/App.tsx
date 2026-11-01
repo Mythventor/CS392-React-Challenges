@@ -101,19 +101,23 @@ const TermSelector = ({ selectedTerm, onSelect }: {
   </div>
 );
 
-const CourseList = ({ courses, selectedTerm, selectedCourses, onToggle }: {
+const CourseList = ({ courses, selectedTerm, selectedCourses, search, onToggle }: {
   courses: Record<string, Course>;
   selectedTerm: Term;
   selectedCourses: string[];
+  search: string;
   onToggle: (id: string) => void;
 }) => {
   const { isAdmin } = useAuth();
+  const query = search.trim().toLowerCase();
   const filteredCourses = Object.entries(courses)
-    .filter(([, course]) => course.term === selectedTerm)
+    .filter(([, course]) => course.term === selectedTerm && (
+      course.number.toLowerCase().includes(query) || course.title.toLowerCase().includes(query)
+    ))
     .sort(([, first], [, second]) => first.number.localeCompare(second.number, undefined, { numeric: true }));
 
   if (filteredCourses.length === 0) {
-    return <p>No courses available for {selectedTerm}.</p>;
+    return <p role="status">{query ? `No courses match “${search.trim()}” in ${selectedTerm}. Try another search or clear it.` : `No courses available for ${selectedTerm}.`}</p>;
   }
 
   return (
@@ -221,6 +225,7 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
   const route = useRoute();
   const { user, loading, isAdmin, roleLoading } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
+  const [search, setSearch] = useState('');
   const { selectedCourses, setSelectedCourses, ready, status, error: planError, retry } = useSavedPlan(user?.uid ?? null, schedule.courses);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
 
@@ -283,12 +288,24 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
         <p role={planError ? 'alert' : 'status'}>{status}</p>
         {planError && <button type="button" onClick={retry} className="mt-2 rounded bg-gray-100 px-3 py-2">Retry plan {planError === 'load' ? 'load' : 'save'}</button>}
       </div>
+      <div className="mb-4">
+        <label htmlFor="course-search" className="mb-2 block font-medium">Search courses</label>
+        <div className="flex flex-wrap gap-2">
+          <input id="course-search" type="search" value={search}
+            placeholder="Search by course number or name"
+            onChange={(event) => setSearch(event.target.value)}
+            className="min-w-0 flex-1 rounded border border-gray-400 p-3 focus-visible:outline-2 focus-visible:outline-purple-700" />
+          <button type="button" disabled={!search} onClick={() => setSearch('')}
+            className="rounded bg-gray-100 px-4 py-2 hover:bg-gray-200 disabled:opacity-40">Clear</button>
+        </div>
+      </div>
       <fieldset disabled={!ready || loading} className="m-0 min-w-0 border-0 p-0">
       <legend className="sr-only">Course selections</legend>
       <CourseList
         courses={schedule.courses}
         selectedTerm={selectedTerm}
         selectedCourses={selectedCourses}
+        search={search}
         onToggle={toggleCourse}
       />
       </fieldset>

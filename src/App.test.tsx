@@ -233,3 +233,47 @@ it('keeps browsing and selection public but hides editing when signed out', asyn
   expect(card).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByRole('link', { name: /Edit/ })).not.toBeInTheDocument();
 });
+
+it('searches course numbers and names within the selected term and clears results', async () => {
+  mockSchedule({
+    F101: { title: 'Intro Programming', term: 'Fall', number: '101', meets: '' },
+    F213: { title: 'Systems', term: 'Fall', number: '213-2', meets: '' },
+    W101: { title: 'Intro Programming Winter', term: 'Winter', number: '101', meets: '' },
+  });
+  render(<App />);
+  await screen.findByRole('button', { name: /Fall CS 101/ });
+  const search = screen.getByRole('searchbox', { name: 'Search courses' });
+  fireEvent.change(search, { target: { value: '213' } });
+  expect(screen.getByRole('button', { name: /Fall CS 213-2/ })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Fall CS 101/ })).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: '  INTRO  ' } });
+  expect(screen.getByRole('button', { name: /Fall CS 101/ })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Winter CS 101/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
+  expect(screen.getByRole('button', { name: /Winter CS 101/ })).toBeInTheDocument();
+  fireEvent.change(search, { target: { value: 'nothing matches' } });
+  expect(screen.getByText(/No courses match/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+  expect(search).toHaveValue('');
+  expect(screen.getByRole('button', { name: /Winter CS 101/ })).toBeInTheDocument();
+  expect(loadSchedule).toHaveBeenCalledTimes(1);
+});
+
+it('keeps hidden courses selected and checks conflicts against them', async () => {
+  mockSchedule({
+    F101: { title: 'Intro', term: 'Fall', number: '101', meets: 'MWF 9:00-9:50' },
+    F213: { title: 'Systems', term: 'Fall', number: '213', meets: 'W 9:30-10:00' },
+  });
+  render(<App />);
+  const selected = await screen.findByRole('button', { name: /Fall CS 101/ });
+  fireEvent.click(selected);
+  const search = screen.getByRole('searchbox', { name: 'Search courses' });
+  fireEvent.change(search, { target: { value: 'Systems' } });
+  expect(screen.getByRole('button', { name: /Fall CS 213/ })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Course plan' }));
+  const details = within(screen.getByRole('list', { name: 'Selected course details' }));
+  expect(details.getByText('Fall CS 101')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+  expect(screen.getByRole('button', { name: /Fall CS 101/ })).toHaveAttribute('aria-pressed', 'true');
+});
