@@ -277,3 +277,37 @@ it('keeps hidden courses selected and checks conflicts against them', async () =
   fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
   expect(screen.getByRole('button', { name: /Fall CS 101/ })).toHaveAttribute('aria-pressed', 'true');
 });
+
+it('combines time, search, and term filters and preserves hidden selections', async () => {
+  mockSchedule({
+    F101: { title: 'Intro Programming', term: 'Fall', number: '101', meets: 'MWF 9:00-9:50' },
+    F213: { title: 'Systems', term: 'Fall', number: '213', meets: 'TuTh 10:00-10:50' },
+    F299: { title: 'Independent study', term: 'Fall', number: '299', meets: '' },
+    W101: { title: 'Winter Programming', term: 'Winter', number: '101', meets: 'MWF 9:00-9:50' },
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: /Fall CS 101/ }));
+  const earliest = screen.getByLabelText('Earliest start');
+  const latest = screen.getByLabelText('Latest end');
+  fireEvent.change(earliest, { target: { value: '10:00' } });
+  expect(screen.queryByRole('button', { name: /Fall CS 101/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Fall CS 299/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Fall CS 213/ })).toBeInTheDocument();
+  fireEvent.change(latest, { target: { value: '10:50' } });
+  expect(screen.getByRole('button', { name: /Fall CS 213/ })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Programming' } });
+  expect(screen.getByText(/No courses match your filters/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear times' }));
+  expect(screen.getByRole('searchbox')).toHaveValue('Programming');
+  expect(screen.getByRole('button', { name: /Fall CS 101/ })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.change(latest, { target: { value: '09:50' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Winter' }));
+  expect(screen.getByRole('button', { name: /Winter CS 101/ })).toBeInTheDocument();
+  fireEvent.change(earliest, { target: { value: '11:00' } });
+  expect(screen.getByRole('alert')).toHaveTextContent('Earliest start must not be later');
+  expect(earliest).toHaveAttribute('aria-invalid', 'true');
+  expect(screen.queryByRole('button', { name: /Winter CS 101/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear times' }));
+  expect(screen.queryByText(/Earliest start must not be later/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Winter CS 101/ })).toBeInTheDocument();
+});

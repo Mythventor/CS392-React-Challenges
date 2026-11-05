@@ -1,3 +1,4 @@
+import { invalidTimeRange, matchesTimeWindow } from './utilities/time-filter';
 import useSavedPlan from './useSavedPlan';
 import WeeklyCalendar from './WeeklyCalendar';
 import { AuthProvider, AuthBanner, useAuth } from './auth';
@@ -101,11 +102,13 @@ const TermSelector = ({ selectedTerm, onSelect }: {
   </div>
 );
 
-const CourseList = ({ courses, selectedTerm, selectedCourses, search, onToggle }: {
+const CourseList = ({ courses, selectedTerm, selectedCourses, search, earliestStart, latestEnd, onToggle }: {
   courses: Record<string, Course>;
   selectedTerm: Term;
   selectedCourses: string[];
   search: string;
+  earliestStart: string;
+  latestEnd: string;
   onToggle: (id: string) => void;
 }) => {
   const { isAdmin } = useAuth();
@@ -113,10 +116,12 @@ const CourseList = ({ courses, selectedTerm, selectedCourses, search, onToggle }
   const filteredCourses = Object.entries(courses)
     .filter(([, course]) => course.term === selectedTerm && (
       course.number.toLowerCase().includes(query) || course.title.toLowerCase().includes(query)
-    ))
+    ) && matchesTimeWindow(course.meets, earliestStart, latestEnd))
     .sort(([, first], [, second]) => first.number.localeCompare(second.number, undefined, { numeric: true }));
 
+  if (invalidTimeRange(earliestStart, latestEnd)) return null;
   if (filteredCourses.length === 0) {
+    if (earliestStart || latestEnd) return <p role="status">No courses match your filters in {selectedTerm}. Try changing the times or clearing the filters.</p>;
     return <p role="status">{query ? `No courses match “${search.trim()}” in ${selectedTerm}. Try another search or clear it.` : `No courses available for ${selectedTerm}.`}</p>;
   }
 
@@ -226,6 +231,9 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
   const { user, loading, isAdmin, roleLoading } = useAuth();
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
   const [search, setSearch] = useState('');
+  const [earliestStart, setEarliestStart] = useState('');
+  const [latestEnd, setLatestEnd] = useState('');
+  const rangeError = invalidTimeRange(earliestStart, latestEnd);
   const { selectedCourses, setSelectedCourses, ready, status, error: planError, retry } = useSavedPlan(user?.uid ?? null, schedule.courses);
   const [isPlanOpen, setIsPlanOpen] = useState(false);
 
@@ -299,6 +307,28 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
             className="rounded bg-gray-100 px-4 py-2 hover:bg-gray-200 disabled:opacity-40">Clear</button>
         </div>
       </div>
+      <fieldset className="mb-4 rounded border border-gray-200 p-3">
+        <legend className="px-1 font-medium">Filter by meeting time</legend>
+        <p id="time-filter-help" className="mb-3 text-sm text-gray-600">The whole class must fit within these times. Leave either limit blank for no limit. Courses without meeting times are hidden while filtering.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1" htmlFor="earliest-start">Earliest start
+            <input id="earliest-start" type="time" value={earliestStart}
+              onChange={(event) => setEarliestStart(event.target.value)}
+              aria-invalid={rangeError} aria-describedby={rangeError ? 'time-filter-error' : 'time-filter-help'}
+              className="rounded border border-gray-400 p-2" />
+          </label>
+          <label className="flex flex-col gap-1" htmlFor="latest-end">Latest end
+            <input id="latest-end" type="time" value={latestEnd}
+              onChange={(event) => setLatestEnd(event.target.value)}
+              aria-invalid={rangeError} aria-describedby={rangeError ? 'time-filter-error' : 'time-filter-help'}
+              className="rounded border border-gray-400 p-2" />
+          </label>
+          <button type="button" disabled={!earliestStart && !latestEnd}
+            onClick={() => { setEarliestStart(''); setLatestEnd(''); }}
+            className="rounded bg-gray-100 px-4 py-2 hover:bg-gray-200 disabled:opacity-40">Clear times</button>
+        </div>
+        {rangeError && <p id="time-filter-error" role="alert" className="mt-2 text-red-700">Earliest start must not be later than latest end.</p>}
+      </fieldset>
       <fieldset disabled={!ready || loading} className="m-0 min-w-0 border-0 p-0">
       <legend className="sr-only">Course selections</legend>
       <CourseList
@@ -306,6 +336,8 @@ const TermPage = ({ schedule, onSaved }: { schedule: Schedule; onSaved: (id: str
         selectedTerm={selectedTerm}
         selectedCourses={selectedCourses}
         search={search}
+        earliestStart={earliestStart}
+        latestEnd={latestEnd}
         onToggle={toggleCourse}
       />
       </fieldset>
