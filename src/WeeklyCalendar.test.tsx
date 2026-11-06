@@ -31,3 +31,18 @@ it('shows instructions when the current term has no selections', () => {
   expect(screen.getByText(/No courses selected for Spring/)).toBeInTheDocument();
   expect(screen.queryByText('Intro course')).not.toBeInTheDocument();
 });
+
+it('keeps colors consistent across days, reordering, and removing/readding courses', () => {
+  const second = { ...course, id: 'F110', number: '110', title: 'Second course', meets: 'TuTh 11:00-11:50' };
+  const { rerender } = render(<WeeklyCalendar courses={[course, second]} term="Fall" />);
+  const monday = screen.getByLabelText('CS 101: Intro course, Monday 9:00-9:50');
+  const original = monday.style.backgroundColor;
+  expect(original).not.toBe('');
+  expect(screen.getByLabelText('CS 101: Intro course, Friday 9:00-9:50').style.backgroundColor).toBe(original);
+  expect(screen.getByLabelText('CS 110: Second course, Tuesday 11:00-11:50').style.backgroundColor).not.toBe(original);
+  rerender(<WeeklyCalendar courses={[second, course]} term="Fall" />);
+  expect(screen.getByLabelText('CS 101: Intro course, Monday 9:00-9:50').style.backgroundColor).toBe(original);
+  rerender(<WeeklyCalendar courses={[second]} term="Fall" />);
+  rerender(<WeeklyCalendar courses={[course]} term="Fall" />);
+  expect(screen.getByLabelText('CS 101: Intro course, Monday 9:00-9:50').style.backgroundColor).toBe(original);
+});

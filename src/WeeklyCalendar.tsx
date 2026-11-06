@@ -1,3 +1,4 @@
+import { getCourseColor } from './utilities/course-colors';
 import { parseMeeting } from './utilities/time-conflicts.js';
 
 type CalendarCourse = { id: string; term: string; number: string; title: string; meets: string };
@@ -41,8 +42,8 @@ export default function WeeklyCalendar({ courses, term }: { courses: CalendarCou
                     <div key={course.id} tabIndex={0}
                       aria-label={`CS ${course.number}: ${course.title}, ${label} ${formatTime(start)}-${formatTime(end)}`}
                       title={`CS ${course.number}: ${course.title}\n${course.meets}`}
-                      className="absolute right-1 left-1 overflow-hidden rounded border border-purple-400 bg-purple-100 px-2 text-xs text-purple-950 focus-visible:outline-2 focus-visible:outline-purple-700"
-                      style={{ top: (start - calendarStart) * pixelsPerMinute, height: (end - start) * pixelsPerMinute }}>
+                      className="absolute right-1 left-1 overflow-hidden rounded border px-2 text-xs focus-visible:outline-2 focus-visible:outline-purple-700"
+                      style={{ backgroundColor: getCourseColor(course.id).background, borderColor: getCourseColor(course.id).border, color: getCourseColor(course.id).text, top: (start - calendarStart) * pixelsPerMinute, height: (end - start) * pixelsPerMinute }}>
                       <strong className="block">CS {course.number}</strong>
                       <span className="block truncate">{course.title}</span>
                       <span className="block">{formatTime(start)}–{formatTime(end)}</span>
@@ -55,7 +56,7 @@ export default function WeeklyCalendar({ courses, term }: { courses: CalendarCou
         </div>
         {unscheduled.length > 0 && <div className="mt-4">
           <h4 className="font-semibold">No meeting time</h4>
-          {unscheduled.map((course) => <p key={course.id}>CS {course.number}: {course.title}</p>)}
+          {unscheduled.map((course) => <p key={course.id} className="mt-2 border-l-4 pl-2" style={{ borderColor: getCourseColor(course.id).border }}>CS {course.number}: {course.title}</p>)}
         </div>}
       </>}
     </section>

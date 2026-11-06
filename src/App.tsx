@@ -1,3 +1,4 @@
+import { getCourseColor } from './utilities/course-colors';
 import { invalidTimeRange, matchesTimeWindow } from './utilities/time-filter';
 import useSavedPlan from './useSavedPlan';
 import WeeklyCalendar from './WeeklyCalendar';
@@ -212,7 +213,7 @@ const CoursePlan = ({ courses, selectedCourses, selectedTerm, onClose }: {
             {selectedCourses.map((id) => {
               const course = courses[id];
               return (
-                <li key={id} className="py-3">
+                <li key={id} className="my-2 border-l-4 py-3 pl-3" style={{ borderLeftColor: getCourseColor(id).border }}>
                   <h3 className="font-semibold">{course.term} CS {course.number}</h3>
                   <p>{course.title}</p>
                   <p className="mt-1 text-gray-600">{course.meets}</p>
